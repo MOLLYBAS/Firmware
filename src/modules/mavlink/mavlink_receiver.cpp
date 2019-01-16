@@ -104,6 +104,8 @@
 #include "mavlink_main.h"
 #include "mavlink_command_sender.h"
 
+#include <uORB/topics/custom_msg.h>
+
 #ifdef CONFIG_NET
 #define MAVLINK_RECEIVER_NET_ADDED_STACK 1360
 #else
@@ -1070,6 +1072,19 @@ MavlinkReceiver::handle_message_set_actuator_control_target(mavlink_message_t *m
 	struct offboard_control_mode_s offboard_control_mode = {};
 
 	struct actuator_controls_s actuator_controls = {};
+	struct custom_msg_s f;
+    	memset(&f, 0, sizeof(f));
+	orb_advert_t _custom_msg_pub = orb_advertise(ORB_ID(custom_msg), &f);
+    	f.timestamp = hrt_absolute_time();
+
+    	f.m0 = set_actuator_control_target.controls[0];
+    	f.m1 = set_actuator_control_target.controls[1];
+    	f.m2 = set_actuator_control_target.controls[2];
+    	f.m3 = set_actuator_control_target.controls[3];
+
+	orb_publish(ORB_ID(custom_msg), _custom_msg_pub, &f);
+
+
 
 	bool values_finite =
 		PX4_ISFINITE(set_actuator_control_target.controls[0]) &&

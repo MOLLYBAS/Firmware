@@ -1,16 +1,26 @@
-Multirotor mixer for PX4FMU
-===========================
+This is a mixing file for directly controlling the motors of a quadrotor
+It is for use with trajectory_generator.py
 
-This file defines a single mixer for a quadrotor in the + configuration. All controls
-are mixed 100%.
+M = control count/ how many inputs
+O = <-ve scale> <+ve scale> <offset> <lower limit> <upper limit>
+S = <group> <index> <-ve scale> <+ve scale> <offset> <lower limit> <upper limit>
 
-R: 4+ 10000 10000 10000 0
-
-Gimbal / payload mixer for last two channels
------------------------------------------------------
-
+Motor 1 = pin 1
 M: 1
-S: 3 5  10000  10000      0 -10000  10000
+O:      10000  10000      0 -10000  10000
+S: 0 0  10000  10000      0 -10000  10000
 
+Motor 2 = pin 2
 M: 1
-S: 3 6  10000  10000      0 -10000  10000
+O:      10000  10000      0 -10000  10000
+S: 0 1  10000  10000      0 -10000  10000
+
+Motor 3 = pin 3
+M: 1
+O:      10000  10000      0 -10000  10000
+S: 0 2  10000  10000      0 -10000  10000
+
+Motor 4 = pin 4
+M: 1
+O:      10000  10000      0 -10000  10000
+S: 0 3 10000 10000 0 -10000 10000

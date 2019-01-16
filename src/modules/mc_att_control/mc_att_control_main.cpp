@@ -52,6 +52,10 @@
 #include <mathlib/math/Limits.hpp>
 #include <mathlib/math/Functions.hpp>
 
+#include <uORB/uORB.h>
+#include <uORB/topics/custom_msg.h>
+#include <uORB/topics/rc_channels.h>
+
 #define TPA_RATE_LOWER_LIMIT 0.05f
 
 #define AXIS_INDEX_ROLL 0
@@ -385,6 +389,32 @@ MulticopterAttitudeControl::landing_gear_state_poll()
 	if (updated) {
 		orb_copy(ORB_ID(landing_gear), _landing_gear_sub, &_landing_gear);
 	}
+}
+
+void
+MulticopterAttitudeControl::custom_poll()
+{
+	/* check if there is a new message */
+	bool updated;
+	orb_check(_custom_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(custom_msg), _custom_sub, &_custom);
+	}
+
+}
+
+void
+MulticopterAttitudeControl::rc_channels_poll()
+{
+	/* check if there is a new message */
+	bool updated;
+	orb_check(_rc_channels_sub, &updated);
+
+	if (updated) {
+		orb_copy(ORB_ID(rc_channels), _rc_channels_sub, &_rc_channels);
+	}
+
 }
 
 float
@@ -777,6 +807,27 @@ MulticopterAttitudeControl::publish_actuator_controls()
 	_actuators.timestamp = hrt_absolute_time();
 	_actuators.timestamp_sample = _sensor_gyro.timestamp;
 
+	custom_poll();
+	rc_channels_poll();
+	
+	if ((double)_rc_channels.channels[4] > 0.0)
+	{
+		_actuators.control[0] = (double)_custom.m0;
+		_actuators.control[1] = (double)_custom.m1;
+		_actuators.control[2] = (double)_custom.m2;
+		_actuators.control[3] = (double)_custom.m3;
+	}
+
+
+	if (!_v_control_mode.flag_armed)
+	{
+		_actuators.control[0] = -1.0;
+		_actuators.control[1] = -1.0;
+		_actuators.control[2] = -1.0;
+		_actuators.control[3] = -1.0;
+	}
+
+
 	/* scale effort by battery status */
 	if (_bat_scale_en.get() && _battery_status.scale > 0.0f) {
 		for (int i = 0; i < 4; i++) {
@@ -805,6 +856,9 @@ MulticopterAttitudeControl::run()
 	_vehicle_status_sub = orb_subscribe(ORB_ID(vehicle_status));
 	_motor_limits_sub = orb_subscribe(ORB_ID(multirotor_motor_limits));
 	_battery_status_sub = orb_subscribe(ORB_ID(battery_status));
+
+	_custom_sub = orb_subscribe(ORB_ID(custom_msg));
+	_rc_channels_sub = orb_subscribe(ORB_ID(rc_channels));
 
 	_gyro_count = math::min(orb_group_count(ORB_ID(sensor_gyro)), MAX_GYRO_COUNT);
 
@@ -999,6 +1053,9 @@ MulticopterAttitudeControl::run()
 	orb_unsubscribe(_sensor_bias_sub);
 	orb_unsubscribe(_vehicle_land_detected_sub);
 	orb_unsubscribe(_landing_gear_sub);
+
+	orb_unsubscribe(_custom_sub);
+	orb_unsubscribe(_rc_channels_sub);
 }
 
 int MulticopterAttitudeControl::task_spawn(int argc, char *argv[])

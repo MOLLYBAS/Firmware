@@ -89,6 +89,8 @@
 #include "mavlink_parameters.h"
 #include "mavlink_timesync.h"
 
+#include <uORB/topics/custom_msg.h>
+
 class Mavlink;
 
 class MavlinkReceiver

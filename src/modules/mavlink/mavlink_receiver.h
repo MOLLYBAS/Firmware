@@ -250,6 +250,9 @@ private:
 	static const int _gps_inject_data_queue_size = 6;
 	orb_advert_t _gps_inject_data_pub;
 	orb_advert_t _command_ack_pub;
+
+	orb_advert_t _custom_msg_pub;
+
 	int _control_mode_sub;
 	int _actuator_armed_sub;
 	int _vehicle_attitude_sub;

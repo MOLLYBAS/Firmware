@@ -164,6 +164,9 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_debug_array_pub(nullptr),
 	_gps_inject_data_pub(nullptr),
 	_command_ack_pub(nullptr),
+	
+	_custom_msg_pub(nullptr),
+
 	_control_mode_sub(orb_subscribe(ORB_ID(vehicle_control_mode))),
 	_actuator_armed_sub(orb_subscribe(ORB_ID(actuator_armed))),
 	_vehicle_attitude_sub(orb_subscribe(ORB_ID(vehicle_attitude))),
@@ -1074,7 +1077,12 @@ MavlinkReceiver::handle_message_set_actuator_control_target(mavlink_message_t *m
 	struct actuator_controls_s actuator_controls = {};
 	struct custom_msg_s f;
     	memset(&f, 0, sizeof(f));
-	orb_advert_t _custom_msg_pub = orb_advertise(ORB_ID(custom_msg), &f);
+
+	if (_custom_msg_pub == nullptr)
+	{
+		_custom_msg_pub = orb_advertise(ORB_ID(custom_msg), &f);
+	}
+
     	f.timestamp = hrt_absolute_time();
 
     	f.m0 = set_actuator_control_target.controls[0];

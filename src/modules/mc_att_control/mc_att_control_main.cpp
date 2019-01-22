@@ -816,17 +816,15 @@ MulticopterAttitudeControl::publish_actuator_controls()
 		_actuators.control[1] = (double)_custom.m1;
 		_actuators.control[2] = (double)_custom.m2;
 		_actuators.control[3] = (double)_custom.m3;
+		
+		if (!_v_control_mode.flag_armed)
+		{
+			_actuators.control[0] = -1.0;
+			_actuators.control[1] = -1.0;
+			_actuators.control[2] = -1.0;
+			_actuators.control[3] = -1.0;
+		}
 	}
-
-
-	if (!_v_control_mode.flag_armed)
-	{
-		_actuators.control[0] = -1.0;
-		_actuators.control[1] = -1.0;
-		_actuators.control[2] = -1.0;
-		_actuators.control[3] = -1.0;
-	}
-
 
 	/* scale effort by battery status */
 	if (_bat_scale_en.get() && _battery_status.scale > 0.0f) {

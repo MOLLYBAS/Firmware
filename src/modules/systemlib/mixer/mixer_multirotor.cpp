@@ -765,7 +765,7 @@ MultirotorMixer::mix(float *outputs, unsigned space, uint16_t *status_reg)
 
 	int error_counter = 0;
 	    // wait for sensor update of 1 file descriptor for 1000 ms (1 second)
-	    int poll_ret = px4_poll(fds, 1, 4);
+	    int poll_ret = px4_poll(fds, 1, 1);
 
 	    // handle the poll result
 	    if (poll_ret == 0)

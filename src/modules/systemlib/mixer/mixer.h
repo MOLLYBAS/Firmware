@@ -557,6 +557,7 @@ public:
 	 */
 
 	int custom_sub;	
+	bool is_tailsitter;
 	px4_pollfd_struct_t* fds = new px4_pollfd_struct_t[1];
 
 	struct Rotor {

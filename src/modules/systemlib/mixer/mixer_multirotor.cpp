@@ -201,6 +201,8 @@ MultirotorMixer::MultirotorMixer(ControlCallback control_cb,
     	//	{ .fd = custom_sub,   .events = POLLIN },
 	//};
 	fds[0]={ .fd = custom_sub,   .events = POLLIN };
+
+	is_tailsitter = false;
 }
 
 MultirotorMixer::~MultirotorMixer()
@@ -274,7 +276,7 @@ MultirotorMixer::from_text(Mixer::ControlCallback control_cb, uintptr_t cb_handl
 //                struct sensor_combined_s raw;
 //                /* copy sensors raw data into local buffer */
 //                orb_copy(ORB_ID(sensor_combined), sensor_sub_fd, &raw);
-//                PX4_INFO("Accelerometer:\t%8.4f\t%8.4f\t%8.4f",
+//                // PX4_INFO("Accelerometer:\t%8.4f\t%8.4f\t%8.4f",
 //                         (double) raw.accelerometer_m_s2[0],
 //                         (double) raw.accelerometer_m_s2[1],
 //                         (double) raw.accelerometer_m_s2[2]);
@@ -422,7 +424,13 @@ MultirotorMixer::mix(float *outputs, unsigned space, uint16_t *status_reg)
 
     //--------------------RD, Start of conditional geometry
 	bool enable_transformation = true;
-    float       frame_state = math::constrain(get_control(3, 5), -1.0f, 1.0f);
+    // float       frame_state = math::constrain(get_control(3, 5), -1.0f, 1.0f);
+	// float       frame_state = math::constrain(outputs[4], -1.0f, 1.0f);
+	float frame_state;
+	// if (outputs[4] > 0.5f){
+	// 	// PX4_INFO("OUTPUTS[4] =  >");
+	// }
+
 //    float       elevon_state = math::constrain(get_control(3, 6), -1.0f, 1.0f);
 
     const Rotor quad_plus[] = {
@@ -470,16 +478,20 @@ MultirotorMixer::mix(float *outputs, unsigned space, uint16_t *status_reg)
     };
 
 	if (enable_transformation == true){
-		if (frame_state >= 0.1f){
+		if (! is_tailsitter){ //changed from >=
 			// _rotor_count = 8;
+			// PX4_INFO("fstate = QUAD");
 			_rotors = quad_plus;
+			frame_state = -1.0f;
 			
 		}
 		else {
 			// _rotor_count = 6;
+			// PX4_INFO("fstate = TAIL");
 			_rotors = config_twin_engine;
+			frame_state = 1.0f;
 		}
-		PX4_ERR("_rotor_count: %d", _rotor_count);
+		// PX4_ERR("_rotor_count: %d", _rotor_count);
 
 	}
 
@@ -664,7 +676,7 @@ MultirotorMixer::mix(float *outputs, unsigned space, uint16_t *status_reg)
 
 
 
-	//PX4_INFO("TESTD");
+	//// PX4_INFO("TESTD");
 	//ADDED end
 	/* slew rate limiting and saturation checking */
 	for (unsigned i = 0; i < _rotor_count; i++) {
@@ -710,9 +722,11 @@ MultirotorMixer::mix(float *outputs, unsigned space, uint16_t *status_reg)
 		(*status_reg) = _saturation_status.value;
 	}
 
-    if (frame_state >= 0.1f){
+    if (! is_tailsitter){ //changed > to <
     // Quad-Rotor State
-        outputs[4] = -0.3f;
+		// PX4_INFO("IN QUAD");
+		outputs[4] = -1.0f;
+        //outputs[4] = -0.3f;
         outputs[5] = -0.3f;
         outputs[6] = -0.3f;
         outputs[7] = -0.3f;
@@ -725,6 +739,8 @@ MultirotorMixer::mix(float *outputs, unsigned space, uint16_t *status_reg)
 
     }
     else {
+		// PX4_INFO("IN TAIL");
+		outputs[4] = 1.0f;
     // Fixed-Wing State
 //        outputs[4] = 1.0f;
 //        outputs[5] = 1.0f;
@@ -733,29 +749,30 @@ MultirotorMixer::mix(float *outputs, unsigned space, uint16_t *status_reg)
 
     }
 
-		if (triggerflag == true){
-			// outputs[0] = outputs[0] + 0.05f;
-			// outputs[2] = outputs[2] + 0.05f;
-			// outputs[0] = outputs[0] + 0.1f;
-			// outputs[2] = outputs[2] + 0.1f;
-			outputs[0] = outputs[0];
-			outputs[2] = outputs[2];
+		// if (triggerflag == true){
+		// 	// outputs[0] = outputs[0] + 0.05f;
+		// 	// outputs[2] = outputs[2] + 0.05f;
+		// 	// outputs[0] = outputs[0] + 0.1f;
+		// 	// outputs[2] = outputs[2] + 0.1f;
+		// 	outputs[0] = outputs[0];
+		// 	outputs[2] = outputs[2];
 			
-			outputs[1] = outputs[1];
-			outputs[3] = outputs[3];
-		}
+		// 	outputs[1] = outputs[1];
+		// 	outputs[3] = outputs[3];
+		// }
 
 //////////////////////Subscribe to ROS node on all 8 actuator channels
 
 	int error_counter = 0;
 	    // wait for sensor update of 1 file descriptor for 1000 ms (1 second)
-	    int poll_ret = px4_poll(fds, 1, 1000);
+	    int poll_ret = px4_poll(fds, 1, 4);
 
 	    // handle the poll result
 	    if (poll_ret == 0)
 	    {
 		// this means none of our providers is giving us data
-		PX4_ERR("Got no data within a second");
+		// PX4_ERR("Got no data within a second");
+		// PX4_ERR("_rotor_count: %d", _rotor_count);
 
 	    }
 	    else if (poll_ret < 0)
@@ -773,7 +790,7 @@ MultirotorMixer::mix(float *outputs, unsigned space, uint16_t *status_reg)
 	    else
 	    {
 
-		if (fds[0].revents & POLLIN)
+		if (fds[0].revents & POLLIN && (poll_ret != 0))
 		{
 		    // obtained data for the first file descriptor
 		    struct custom_msg_s raw;
@@ -784,29 +801,57 @@ MultirotorMixer::mix(float *outputs, unsigned space, uint16_t *status_reg)
 
 		    //useful for debugging:
 			
-		    // PX4_INFO("Motor Values:\t%8.4f\t%8.4f\t%8.4f\t%8.4f",
+		    // // PX4_INFO("Motor Values:\t%8.4f\t%8.4f\t%8.4f\t%8.4f",
 		    //      (double)raw.m0,
 		    //      (double)raw.m1,
 		    //      (double)raw.m2,
 		    //      (double)raw.m3);
 			
 
-		    outputs[0] = (double)raw.m0;
-		    outputs[1] = (double)raw.m1;
-		    outputs[2] = (double)raw.m2;
-		    outputs[3] = (double)raw.m3;
+		    // outputs[0] = (double)raw.m0;
+		    // outputs[1] = (double)raw.m1;
+		    // outputs[2] = (double)raw.m2;
+		    // outputs[3] = (double)raw.m3;
 		    outputs[4] = (double)raw.m4;
-		    outputs[5] = (double)raw.m5;
-		    outputs[6] = (double)raw.m6;
-		    outputs[7] = (double)raw.m7;
-
-			if ((double)outputs[4] >= .1){
+		    // outputs[5] = (double)raw.m5;
+		    // outputs[6] = (double)raw.m6;
+		    // outputs[7] = (double)raw.m7;
+			// PX4_INFO("toggle channel: %8.4f", (double)raw.m4);
+			if ((double)raw.m4 >= .1){
+				outputs[4] = 1.0f;
 				_rotor_count = 6;
+				// PX4_INFO("toggle to TAIL");
+				is_tailsitter = true;
 				// frame_state = 1.0f;
+				// close
 			}
-			else
+			else{
 				// frame_state = -1.0f;
+				outputs[4] = -1.0f;
 				_rotor_count = 8;
+				// PX4_INFO("toggle to QUAD");
+				is_tailsitter = false;
+				// open
+			}
+
+
+	// 			    if (frame_state >= 0.1f){
+    // // Quad-Rotor State
+	// 	outputs[4] = -1.0f;
+    //     //outputs[4] = -0.3f;
+    //     outputs[5] = -0.3f;
+    //     outputs[6] = -0.3f;
+    //     outputs[7] = -0.3f;
+
+	// 	// Used for setting a 1500us for gluing controlsurface horns 
+	// 	// outputs[4] = -0.0f;
+    //     // outputs[5] = -0.0f;
+    //     // outputs[6] = -0.0f;
+    //     // outputs[7] = -0.0f;
+
+    // }
+    // else {
+	// 	outputs[4] = 1.0f;
 
 		// 			PX4_ERR("frame_state: %d", (double)frame_state);
 		// PX4_ERR("outputs[4]: %d", (double)outputs[4]);
@@ -818,15 +863,15 @@ MultirotorMixer::mix(float *outputs, unsigned space, uint16_t *status_reg)
 			// 	frame_state = -.9f;
 
 			// PX4_ERR("frame_state: %d", (float));
-					    PX4_INFO("Motor Values:\t%8.4f\t%8.4f\t%8.4f\t%8.4f\t%8.4f\t%8.4f\t%8.4f\t%8.4f",
-		         (double)outputs[0],
-		         (double)outputs[1],
-		         (double)outputs[2],
-		         (double)outputs[3],
-				 (double)outputs[4],
-		         (double)outputs[5],
-		         (double)outputs[6],
-		         (double)outputs[7]);
+				// 	    PX4_INFO("Motor Values:\t%8.4f\t%8.4f\t%8.4f\t%8.4f\t%8.4f\t%8.4f\t%8.4f\t%8.4f",
+		        //  (double)outputs[0],
+		        //  (double)outputs[1],
+		        //  (double)outputs[2],
+		        //  (double)outputs[3],
+				//  (double)outputs[4],
+		        //  (double)outputs[5],
+		        //  (double)outputs[6],
+		        //  (double)outputs[7]);
 		}
 	    }
 
@@ -835,13 +880,13 @@ MultirotorMixer::mix(float *outputs, unsigned space, uint16_t *status_reg)
 		// PX4_ERR("frame_state: %d", (double)frame_state);
 		// PX4_ERR("outputs[4]: %f", outputs[4]);
 
-		// PX4_INFO("frame_State:\t%8.4f",(double)frame_state); 
+		// // PX4_INFO("frame_State:\t%8.4f",(double)frame_state); 
 		// PX4_ERR("outputs[4]: %f",outputs[4]); 
 
 //////////////////////End Subscribe to ROS node on all 8 actuator channels
 
 
-
+	
 
 
 
